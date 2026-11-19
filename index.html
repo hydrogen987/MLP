@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLP Lab · 多层感知机参数实验室</title>
+<meta name="description" content="从零实现多层感知机（MLP），实时可视化决策边界、损失曲线与神经元激活，交互理解学习率、隐藏层、激活函数、批大小、优化器等训练参数。" />
+<meta name="theme-color" content="#060a0f" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070d12'/%3E%3Cg fill='none' stroke='%232ee6c8' stroke-width='2'%3E%3Ccircle cx='9' cy='10' r='2.5'/%3E%3Ccircle cx='9' cy='22' r='2.5'/%3E%3Ccircle cx='23' cy='16' r='2.5'/%3E%3Cpath d='M11.5 11l9 4M11.5 21l9-4'/%3E%3C/g%3E%3C/svg%3E" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-step" viewBox="0 0 24 24"><path d="M6 5l9 7-9 7z" fill="currentColor"/><path d="M18 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M4.5 11a7.5 7.5 0 1 1 2.2 6.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 5v6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h3.2l9.6 10H20M4 17h3.2l9.6-10H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17.5 4.5L20 7l-2.5 2.5M17.5 14.5L20 17l-2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top" aria-label="MLP Lab 首页">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="26" height="26">
+          <g fill="none" stroke="currentColor" stroke-width="1.6">
+            <circle cx="8" cy="9" r="2.6"/><circle cx="8" cy="23" r="2.6"/>
+            <circle cx="17" cy="16" r="2.6"/><circle cx="26" cy="16" r="2.6"/>
+            <path d="M10.4 10.2l4.3 4.2M10.4 21.8l4.3-4.2M19.6 16h3.8"/>
+          </g>
+        </svg>
+      </span>
+      MLP<span class="brand-dim">lab</span>
+    </a>
+    <nav class="nav-links" aria-label="页面导航">
+      <a href="#lab">实验台</a>
+      <a href="#manual">参数手册</a>
+      <a href="#presets">预设实验</a>
+      <a href="#sweep">对照实验</a>
+      <a href="#math">原理</a>
+    </nav>
+    <a class="btn btn-ghost nav-cta" href="#lab">打开实验台</a>
+  </div>
+</header>
+
+<noscript>
+  <div class="noscript">本实验台使用 JavaScript 实时训练神经网络。请启用 JavaScript 后刷新页面。</div>
+</noscript>
+
+<main id="top">
+  <!-- ============ HERO ============ -->
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="pulse-dot"></span> MULTI-LAYER PERCEPTRON LAB</p>
+      <h1>看见神经网络<br /><span class="grad">如何学习</span></h1>
+      <p class="lede">从零实现多层感知机，把学习率、隐藏层、激活函数、批大小这些抽象参数，变成可以实时观察的决策边界、损失曲线与神经元激活。</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" id="heroStart" href="#lab"><svg class="icon"><use href="#i-play"/></svg>开始实验</a>
+        <a class="btn btn-ghost" href="#manual">阅读参数手册<svg class="icon"><use href="#i-arrow"/></svg></a>
+      </div>
+      <div class="hero-badges">
+        <span><i class="tick"></i>纯 JavaScript 实现</span>
+        <span><i class="tick"></i>实时决策边界</span>
+        <span><i class="tick"></i>数据不离开浏览器</span>
+      </div>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="hero-glow"></div>
+      <svg class="hero-net" viewBox="0 0 420 300">
+        <g class="edges">
+          <line x1="64" y1="110" x2="210" y2="52" class="pulse"/><line x1="64" y1="110" x2="210" y2="114"/>
+          <line x1="64" y1="110" x2="210" y2="176"/><line x1="64" y1="110" x2="210" y2="238" class="pulse"/>
+          <line x1="64" y1="190" x2="210" y2="52"/><line x1="64" y1="190" x2="210" y2="114" class="pulse"/>
+          <line x1="64" y1="190" x2="210" y2="176"/><line x1="64" y1="190" x2="210" y2="238"/>
+          <line x1="210" y1="52" x2="356" y2="150"/><line x1="210" y1="114" x2="356" y2="150" class="pulse"/>
+          <line x1="210" y1="176" x2="356" y2="150"/><line x1="210" y1="238" x2="356" y2="150"/>
+        </g>
+        <g class="nodes">
+          <circle cx="64" cy="110" r="7"/><circle cx="64" cy="190" r="7"/>
+          <circle cx="210" cy="52" r="7"/><circle cx="210" cy="114" r="7"/><circle cx="210" cy="176" r="7"/><circle cx="210" cy="238" r="7"/>
+          <circle cx="356" cy="150" r="9" class="out"/>
+        </g>
+        <g class="net-labels">
+          <text x="40" y="114">x₁</text><text x="40" y="194">x₂</text>
+          <text x="376" y="154">p</text>
+          <text x="132" y="286">hidden</text>
+        </g>
+      </svg>
+      <span class="chip chip-a">η = 0.03</span>
+      <span class="chip chip-b">batch 16</span>
+      <span class="chip chip-c">ReLU × 2</span>
+      <div class="hero-caption"><span class="live-dot"></span>2 → 4 → 1 · 前向传播进行中</div>
+    </div>
+  </section>
+
+  <!-- ============ LAB ============ -->
+  <section id="lab" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">01 / 实验台</p>
+        <h2>调整参数，观察网络如何改变</h2>
+        <p class="section-sub">训练在浏览器里逐轮进行。每一次参数更新都会重绘决策边界、损失曲线与权重连线——先点「开始训练」，再改参数试试。</p>
+      </div>
+
+      <div class="lab-grid">
+        <aside class="panel controls" aria-label="训练参数控制台">
+          <div class="controls-head">
+            <h3>控制台</h3>
+            <span class="status"><i id="statusDot" class="status-dot"></i><span id="statusLine">准备就绪</span></span>
+          </div>
+
+          <div class="actions">
+            <button id="btnPlay" class="btn btn-primary btn-play" type="button">
+              <svg class="icon"><use id="playIcon" href="#i-play"/></svg><span id="playLabel">开始训练</span>
+            </button>
+            <button id="btnStep" class="btn btn-ghost" type="button" title="训练一个 epoch">
+              <svg class="icon"><use href="#i-step"/></svg>单步
+            </button>
+            <button id="btnReset" class="btn btn-ghost" type="button">
+              <svg class="icon"><use href="#i-reset"/></svg>重置
+            </button>
+          </div>
+          <button id="btnShuffle" class="btn btn-quiet" type="button">
+            <svg class="icon"><use href="#i-shuffle"/></svg>重新采样数据
+          </button>
+          <p class="key-hint">提示：空格键可以开始 / 暂停训练</p>
+
+          <div class="divider"></div>
+
+          <div class="control">
+            <div class="control-head"><span>数据集</span><span class="hint">点击切换</span></div>
+            <div class="seg seg-grid" id="datasetSeg" role="group" aria-label="数据集">
+              <button data-value="xor" class="is-active" aria-pressed="true">异或</button>
+              <button data-value="circle" aria-pressed="false">圆环</button>
+              <button data-value="moons" aria-pressed="false">双月</button>
+              <button data-value="spiral" aria-pressed="false">螺旋</button>
+              <button data-value="blobs" aria-pressed="false">高斯团</button>
+              <button data-value="checker" aria-pressed="false">棋盘</button>
+            </div>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label for="nRange">样本数</label><output id="nVal">400</output></div>
+            <input id="nRange" type="range" min="40" max="800" step="20" value="400" />
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label for="noiseRange">噪声强度</label><output id="noiseVal">0.18</output></div>
+            <input id="noiseRange" type="range" min="0" max="45" step="1" value="18" />
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="control">
+            <div class="control-head"><span>隐藏层</span><output id="layersVal">2 层</output></div>
+            <div class="seg" id="layersSeg" role="group" aria-label="隐藏层数量">
+              <button data-value="0" aria-pressed="false">0</button>
+              <button data-value="1" aria-pressed="false">1</button>
+              <button data-value="2" class="is-active" aria-pressed="true">2</button>
+              <button data-value="3" aria-pressed="false">3</button>
+            </div>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label for="widthRange">每层宽度</label><output id="widthVal">8</output></div>
+            <input id="widthRange" type="range" min="2" max="16" step="1" value="8" />
+          </div>
+
+          <div class="control">
+            <div class="control-head"><span>激活函数</span></div>
+            <div class="seg" id="activationSeg" role="group" aria-label="激活函数">
+              <button data-value="relu" class="is-active" aria-pressed="true">ReLU</button>
+              <button data-value="tanh" aria-pressed="false">Tanh</button>
+              <button data-value="sigmoid" aria-pressed="false">Sigmoid</button>
+              <button data-value="leaky" aria-pressed="false">Leaky</button>
+            </div>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label for="initSelect">初始化</label></div>
+            <select id="initSelect">
+              <option value="he">He 正态（适配 ReLU）</option>
+              <option value="xavier">Xavier 正态（适配 Tanh）</option>
+              <option value="small">小随机（σ = 0.1）</option>
+              <option value="zeros">全零（对称性陷阱）</option>
+            </select>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="control">
+            <div class="control-head"><span>优化器</span></div>
+            <div class="seg seg-grid" id="optimizerSeg" role="group" aria-label="优化器">
+              <button data-value="sgd" aria-pressed="false">SGD</button>
+              <button data-value="momentum" aria-pressed="false">Momentum</button>
+              <button data-value="rmsprop" aria-pressed="false">RMSProp</button>
+              <button data-value="adam" class="is-active" aria-pressed="true">Adam</button>
+            </div>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label for="lrRange">学习率 η</label><output id="lrVal">0.030</output></div>
+            <input id="lrRange" type="range" min="0" max="100" step="0.5" value="47" />
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label for="batchSelect">批大小</label></div>
+            <select id="batchSelect">
+              <option value="1">1（随机梯度）</option>
+              <option value="4">4</option>
+              <option value="8">8</option>
+              <option value="16" selected>16</option>
+              <option value="32">32</option>
+              <option value="64">64</option>
+              <option value="0">全部（全批量）</option>
+            </select>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label for="l2Range">L2 正则 λ</label><output id="l2Val">0.000</output></div>
+            <input id="l2Range" type="range" min="0" max="100" step="1" value="0" />
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="control">
+            <div class="control-head"><label for="speedRange">训练速度</label><output id="speedVal">4 轮 / 帧</output></div>
+            <input id="speedRange" type="range" min="1" max="20" step="1" value="4" />
+          </div>
+        </aside>
+
+        <div class="stage">
+          <div class="stats" aria-live="polite">
+            <div class="stat"><span>轮次 epoch</span><b id="statEpoch">0</b></div>
+            <div class="stat"><span>训练损失</span><b id="statLoss">—</b></div>
+            <div class="stat"><span>训练准确率</span><b id="statTrainAcc">—</b></div>
+            <div class="stat"><span>测试准确率</span><b id="statTestAcc">—</b></div>
+            <div class="stat"><span>参数量</span><b id="statParams">—</b></div>
+            <div class="stat"><span>每轮耗时</span><b id="statSpeed">—</b></div>
+          </div>
+
+          <div class="stage-grid">
+            <section class="panel card boundary-card">
+              <header class="card-head">
+                <div>
+                  <h3>决策边界</h3>
+                  <p>背景颜色 = 网络输出的 p(y = 1)</p>
+                </div>
+                <div class="legend">
+                  <span><i class="dot c0"></i>类别 0</span>
+                  <span><i class="dot c1"></i>类别 1</span>
+                  <span><i class="ring"></i>测试点</span>
+                </div>
+              </header>
+              <div class="boundary-wrap">
+                <canvas id="boundaryCanvas" class="boundary-canvas" aria-label="决策边界可视化"></canvas>
+              </div>
+              <footer class="card-foot">
+                <span>在画布上移动或点按，放置「探针」查看该位置的激活</span>
+                <span id="probeLabel" class="mono">探针 —</span>
+              </footer>
+            </section>
+
+            <section class="panel card">
+              <header class="card-head">
+                <div>
+                  <h3>损失与准确率</h3>
+                  <p>按 epoch 记录，准确率对应右轴</p>
+                </div>
+                <div class="legend">
+                  <span><i class="line teal"></i>损失</span>
+                  <span><i class="line amber"></i>准确率</span>
+                </div>
+              </header>
+              <canvas id="lossCanvas" class="chart-canvas" aria-label="损失与准确率曲线"></canvas>
+            </section>
+
+            <section class="panel card">
+              <header class="card-head">
+                <div>
+                  <h3>网络与激活</h3>
+                  <p id="netMeta">2 → 8 → 8 → 1 · ReLU · Adam</p>
+                </div>
+                <div class="legend">
+                  <span><i class="line teal"></i>正权重</span>
+                  <span><i class="line coral"></i>负权重</span>
+                </div>
+              </header>
+              <canvas id="netCanvas" class="net-canvas" aria-label="网络结构与神经元激活"></canvas>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MANUAL ============ -->
+  <section id="manual" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">02 / 参数手册</p>
+        <h2>八个旋钮，决定网络学成什么样</h2>
+        <p class="section-sub">每个参数都在改变同一件事：参数更新的方向与步长，或者模型能表达的函数复杂度。读完后可以直接载入对应实验。</p>
+      </div>
+
+      <div class="manual-grid">
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">01</span><span class="tag">优化</span></div>
+          <h3>学习率 <em>η · learning rate</em></h3>
+          <p>每次参数更新迈出的步子。梯度只告诉你「往哪走」，学习率决定「走多远」。过大会一步跨过谷底、来回震荡；过小则收敛极慢，看起来像没在学。</p>
+          <div class="formula-inline">θ ← θ − η · ∂L/∂θ</div>
+          <p class="observe"><b>观察</b>把 η 从 0.001 一路调到 8，看损失曲线先变陡，最后在 0.6 附近来回跳动。</p>
+          <button class="mini-link" data-preset="lr-high">载入「学习率过大」→</button>
+        </article>
+
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">02</span><span class="tag">容量</span></div>
+          <h3>隐藏层与宽度 <em>depth · width</em></h3>
+          <p>层数决定非线性变换叠加的次数，宽度决定每层能容纳多少个特征检测器。0 个隐藏层等价于逻辑回归，只能画一条直线；1–2 层足以应付本页大多数二维数据。</p>
+          <div class="formula-inline">h⁽ˡ⁾ = f(W⁽ˡ⁾h⁽ˡ⁻¹⁾ + b⁽ˡ⁾)</div>
+          <p class="observe"><b>观察</b>把层数切到 0，圆环数据集会立刻变成一条直线切开的样子。</p>
+          <button class="mini-link" data-preset="underfit">载入「容量不足」→</button>
+        </article>
+
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">03</span><span class="tag">非线性</span></div>
+          <h3>激活函数 <em>activation</em></h3>
+          <p>没有它，多层线性变换仍然等价于一层。ReLU 计算快、正半轴不饱和；Tanh 输出零中心、曲线平滑；Sigmoid 两端饱和，深层容易梯度消失；LeakyReLU 给负半轴留了一条小缝。</p>
+          <div class="formula-inline">ReLU(z) = max(0, z) · Tanh(z) = (eᶻ−e⁻ᶻ)/(eᶻ+e⁻ᶻ)</div>
+          <p class="observe"><b>观察</b>把激活函数换成 Sigmoid，再把隐藏层加到 3 层，训练明显变慢。</p>
+          <button class="mini-link" data-preset="optimizer">在对照实验里比较 →</button>
+        </article>
+
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">04</span><span class="tag">随机性</span></div>
+          <h3>批大小 <em>batch size</em></h3>
+          <p>一次参数更新使用多少个样本。小批量引入梯度噪声，曲线更抖，但常带来更好的泛化；大批量梯度更准、每轮更新次数更少。批大小为 1 就是纯随机梯度下降。</p>
+          <div class="formula-inline">g = (1/B) Σᵢ ∇L(xᵢ)</div>
+          <p class="observe"><b>观察</b>把批大小从 64 调到 1，损失曲线会从平滑变得毛糙。</p>
+        </article>
+
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">05</span><span class="tag">优化</span></div>
+          <h3>优化器 <em>optimizer</em></h3>
+          <p>SGD 只看当前梯度；Momentum 累积速度，能冲过平坦区；RMSProp 按梯度平方缩放每个参数的学习率；Adam 结合两者并做偏差修正，通常收敛最快，但也可能在小数据上过拟合。</p>
+          <div class="formula-inline">Adam: m̂ / (√v̂ + ε) 代替原始梯度</div>
+          <p class="observe"><b>观察</b>在对照实验里同时训练四个优化器，比较损失曲线分叉的早晚。</p>
+          <button class="mini-link" data-preset="optimizer">载入「优化器对照」→</button>
+        </article>
+
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">06</span><span class="tag">正则</span></div>
+          <h3>L2 正则 <em>weight decay</em></h3>
+          <p>在损失里加上 λ/2·‖W‖²，等价于每次更新都把权重往 0 拉一点。它抑制过大的权重，让决策边界更平滑。λ 太大会让网络欠拟合，边界变得过于保守。</p>
+          <div class="formula-inline">L = L<sub>CE</sub> + (λ/2) Σ ‖W‖²</div>
+          <p class="observe"><b>观察</b>在过拟合实验里把 λ 从 0 调到 0.05，边界的小岛会被抹平。</p>
+        </article>
+
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">07</span><span class="tag">起点</span></div>
+          <h3>初始化 <em>initialization</em></h3>
+          <p>权重初始值决定训练的起点。He 初始化适配 ReLU，Xavier 适配 Tanh。如果全部初始化为 0，同一层的神经元梯度完全相同，对称性永远无法打破——网络什么也学不到。</p>
+          <div class="formula-inline">He: σ = √(2/n<sub>in</sub>) · Xavier: σ = √(2/(n<sub>in</sub>+n<sub>out</sub>))</div>
+          <p class="observe"><b>观察</b>选择「全零」初始化，损失会一直停在 ln 2 ≈ 0.693。</p>
+          <button class="mini-link" data-preset="zeros">载入「零初始化」→</button>
+        </article>
+
+        <article class="manual-card">
+          <div class="manual-top"><span class="num">08</span><span class="tag">泛化</span></div>
+          <h3>轮数与数据 <em>epochs · data</em></h3>
+          <p>一个 epoch 表示完整遍历一次训练集。训练损失下降但测试准确率停滞，通常意味着过拟合；两者都高但损失不降，可能是学习率或容量不合适。噪声越大，越需要正则化。</p>
+          <div class="formula-inline">gap = acc<sub>train</sub> − acc<sub>test</sub></div>
+          <p class="observe"><b>观察</b>关注「训练 / 测试准确率」两个数字的差距，而不只是损失。</p>
+          <button class="mini-link" data-preset="overfit">载入「过拟合」→</button>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PRESETS ============ -->
+  <section id="presets" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">03 / 预设实验</p>
+        <h2>六个已经调好的「翻车现场」</h2>
+        <p class="section-sub">从失败的配置入手，比读十遍定义更容易记住参数的作用。点击后会载入参数并自动开始训练。</p>
+      </div>
+      <div class="preset-grid" id="presetGrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ SWEEP ============ -->
+  <section id="sweep" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">04 / 对照实验</p>
+        <h2>一次只改一个参数</h2>
+        <p class="section-sub">同一个数据集、同一套网络，只改变一个变量，让四条损失曲线在同一个坐标系里分叉。这是理解超参数最直接的方式。</p>
+      </div>
+
+      <div class="panel sweep-panel">
+        <div class="sweep-bar">
+          <div class="sweep-param">
+            <span class="sweep-label">扫描参数</span>
+            <div class="seg seg-wrap" id="sweepSeg" role="group" aria-label="对照实验参数">
+              <button data-value="lr" class="is-active" aria-pressed="true">学习率</button>
+              <button data-value="activation" aria-pressed="false">激活函数</button>
+              <button data-value="width" aria-pressed="false">隐藏层宽度</button>
+              <button data-value="optimizer" aria-pressed="false">优化器</button>
+              <button data-value="init" aria-pressed="false">初始化</button>
+            </div>
+          </div>
+          <div class="sweep-run">
+            <button id="btnSweep" class="btn btn-primary" type="button"><svg class="icon"><use href="#i-spark"/></svg>运行对照实验</button>
+            <span id="sweepStatus" class="sweep-status mono">使用当前数据集 · 160 轮</span>
+          </div>
+        </div>
+
+        <div class="sweep-grid">
+          <div class="sweep-chart-wrap">
+            <canvas id="sweepChart" class="sweep-chart" aria-label="四组实验的损失曲线"></canvas>
+            <div class="sweep-legend" id="sweepLegend"></div>
+          </div>
+          <div class="sweep-cards" id="sweepCards"></div>
+        </div>
+        <p class="sweep-note">每组的训练轮数、初始化和数据完全相同；结束后在卡片中给出训练 / 测试准确率。曲线越早下降并保持平稳，说明该设置越有效。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MATH ============ -->
+  <section id="math" class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">05 / 实现原理</p>
+        <h2>六行公式，一个反向传播</h2>
+        <p class="section-sub">页面里的每一块颜色都来自下面这些计算——没有框架、没有预训练权重，只有矩阵乘法、链式法则和一块画布。</p>
+      </div>
+
+      <div class="math-grid">
+        <div class="panel math-card">
+          <div class="eq">
+            <span class="eq-label">前向传播</span>
+            <div class="formula">a<sup>(l)</sup> = f( W<sup>(l)</sup> a<sup>(l−1)</sup> + b<sup>(l)</sup> )</div>
+            <p>每一层先做仿射变换，再过激活函数。最后一层的标量输出经过 sigmoid，解释为 p(y = 1)。</p>
+          </div>
+          <div class="eq">
+            <span class="eq-label">损失函数</span>
+            <div class="formula">L = −(1/N) Σ [ y ln p + (1−y) ln(1−p) ] + (λ/2) Σ ‖W‖²</div>
+            <p>二元交叉熵衡量预测概率与标签的差距，第二项是可选 L2 正则。</p>
+          </div>
+          <div class="eq">
+            <span class="eq-label">输出层误差</span>
+            <div class="formula">δ<sup>(L)</sup> = p − y</div>
+            <p>sigmoid 与交叉熵的导数恰好抵消，得到这个干净的形式——也是代码里唯一没有显式求导的地方。</p>
+          </div>
+          <div class="eq">
+            <span class="eq-label">误差反传</span>
+            <div class="formula">δ<sup>(l)</sup> = ( (W<sup>(l+1)</sup>)<sup>T</sup> δ<sup>(l+1)</sup> ) ⊙ f′(z<sup>(l)</sup>)</div>
+            <p>把后一层的误差按权重加权传回来，再乘上本层激活函数的导数，这就是链式法则。</p>
+          </div>
+          <div class="eq">
+            <span class="eq-label">梯度</span>
+            <div class="formula">∂L/∂W<sup>(l)</sup> = δ<sup>(l)</sup> (a<sup>(l−1)</sup>)<sup>T</sup> &nbsp;&nbsp; ∂L/∂b<sup>(l)</sup> = δ<sup>(l)</sup></div>
+            <p>梯度就是「本层误差 × 上一层激活」，一个外积就完成了整层权重的更新方向。</p>
+          </div>
+          <div class="eq">
+            <span class="eq-label">参数更新</span>
+            <div class="formula">θ ← θ − η · (g + λθ) &nbsp;&nbsp;|&nbsp;&nbsp; Adam: θ ← θ − η · m̂ / (√v̂ + ε)</div>
+            <p>朴素 SGD 直接用梯度；Adam 再维护梯度的一阶矩与二阶矩，并做偏差修正。</p>
+          </div>
+        </div>
+
+        <div class="panel code-card">
+          <div class="code-head">
+            <span class="win-dot r"></span><span class="win-dot y"></span><span class="win-dot g"></span>
+            <span class="code-title">network.js · backward()</span>
+          </div>
+<pre><code><span class="cm">// 输出层：sigmoid + 交叉熵 ⇒ δ = p − y</span>
+deltas[L - 1] = new Float64Array([cache.p - y]);
+
+<span class="kw">for</span> (<span class="kw">let</span> l = L - <span class="num">1</span>; l &gt;= <span class="num">0</span>; l--) {
+  <span class="kw">const</span> d = deltas[l];
+  <span class="kw">const</span> aPrev = acts[l];
+
+  <span class="cm">// 1. 用本层误差累积 W、b 的梯度</span>
+  <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; nOut; i++) {
+    gB[i] += d[i];
+    <span class="kw">for</span> (<span class="kw">let</span> j = <span class="num">0</span>; j &lt; nIn; j++)
+      gW[i * nIn + j] += d[i] * aPrev[j];
+  }
+
+  <span class="cm">// 2. 把误差传回上一层，乘激活导数</span>
+  <span class="kw">if</span> (l &gt; <span class="num">0</span>) {
+    <span class="kw">for</span> (<span class="kw">let</span> j = <span class="num">0</span>; j &lt; nIn; j++) {
+      <span class="kw">let</span> s = <span class="num">0</span>;
+      <span class="kw">for</span> (<span class="kw">let</span> i = <span class="num">0</span>; i &lt; nOut; i++)
+        s += W[i * nIn + j] * d[i];
+      deltas[l - <span class="num">1</span>][j] =
+        s * act.df(zs[l - <span class="num">1</span>][j], aPrev[j]);
+    }
+  }
+}</code></pre>
+          <div class="code-foot">
+            <div class="code-item"><b>Float64Array</b><span>参数与梯度都用定长双精度数组，避免训练热路径产生垃圾。</span></div>
+            <div class="code-item"><b>requestAnimationFrame</b><span>每帧训练若干 epoch，训练与渲染共享同一个帧预算。</span></div>
+            <div class="code-item"><b>Canvas 2D</b><span>决策边界在 84 × 84 的网格上采样，再平滑放大到画布。</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="24" height="24"><g fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="9" r="2.6"/><circle cx="8" cy="23" r="2.6"/><circle cx="17" cy="16" r="2.6"/><circle cx="26" cy="16" r="2.6"/><path d="M10.4 10.2l4.3 4.2M10.4 21.8l4.3-4.2M19.6 16h3.8"/></g></svg>
+      </span>
+      <div><strong>MLP Lab</strong><span>多层感知机参数实验室</span></div>
+    </div>
+    <p class="footer-note">纯前端实现 · 无依赖 · 无后端 · 所有训练与数据都留在本机浏览器</p>
+    <a class="footer-top" href="#top">回到顶部 ↑</a>
+  </div>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="js/network.js" defer></script>
+<script src="js/datasets.js" defer></script>
+<script src="js/viz.js" defer></script>
+<script src="js/sweep.js" defer></script>
+<script src="js/app.js" defer></script>
+</body>
+</html>
